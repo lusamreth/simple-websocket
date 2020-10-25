@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="main.css">
+    <title>Document</title>
+</head>
+<body>
+    <div class="echo-back">
+        <div class="inp">
+            <p class="entry">Input data! </p>
+            <input type="text" id="textinput" placeholder="Echo through socket">
+            <input type="text" placeholder="echo time!" id="echo-input">
+            <button id = "submitbut" onclick="doubleEcho()">Submit</button>
+        </div>
+        <div class="result">
+            <h2>Result</h2>
+            <p>ECHO back : <p id="result" class="res-field">result goes here!</p></p>
+        </div>
+    </div>
+    <div class="back" id="back-2" back-location="todo.html"><h1>&lt&lt</h1></div>
+    <div class="next" id="next-2" next-location="pinning.html"><h1>&gt&gt</h1></div>
+</body>
+</html>
+<script src="shared.js"></script>
+<script>
+    const address = "ws://127.0.0.1:8080/wss";
+    let ws = new WebSocket(address);
+   ws.onopen = (e) => {
+        ws.send("ping pong");
+    }
+    let inputfield = document.getElementById("textinput");
+    let resultfield = document.getElementById("result");
+    let echo_field = document.getElementById("echo-input");
+    function doubleEcho(){
+        let value = inputfield.value;
+        // bounce back twice
+        let echo_val = echo_field.value;
+        for(let i=0;i<echo_val;i++){
+            ws.send(value)
+        }
+        let buffer = [];
+        ws.onmessage= (event) => {
+            buffer.push(event.data);
+            for(let i =0 ;i<event.data.split(",");i++){
+                buffer.push(event.data[i]);
+            }
+            if (value === ""){
+                console.log("true")
+                resultfield.style.background = "red";
+                resultfield.style.color = "white";
+                resultfield.innerHTML = "please input data!"
+            }else{
+                resultfield.style.background = "green";
+                resultfield.style.color = "white";
+                resultfield.innerHTML = buffer;
+            }
+        }
+    }
+</script>

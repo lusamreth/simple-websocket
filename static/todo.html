@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="main.css">
+    <title>Document</title>
+</head>
+<header>
+    <h2>Hello</h2>
+    <div class="desc">
+        <h3>Welcome to testing Websocket</h3>
+        <p>We gonna test some web socket app</p>
+    </div>
+</header>
+<br>
+<body>   
+    <br>
+    <div class="real-time-todo">
+        <h2>Todolist!</h2>
+        <div class="input-todo">
+            <input type="text" placeholder="Todo something today" id="todoinput">
+            <button id="submit-todo">Submit</button>
+        </div>
+        <div id="todo-box">
+        </div>
+    </div>
+    <div class="next" id="next-1" flag=0 next-location="echo.html"><h1>>></h1></div>
+</body>
+</html>
+<script src="shared.js"></script>
+<script>
+    //import todo from "../static/todo.js";
+    const addr = "ws://127.0.0.1:8080/wss";
+    let ws = new WebSocket(addr);
+
+    let count = 0;
+    let todo_input = document.getElementById("todoinput");
+    let todo_list = document.getElementById("todo-list");
+    let todo_box = document.getElementById("todo-box");
+    let list = [];
+    function submittodo(){
+        let value = todo_input.value;
+        if (value === "") return;
+        ws.send(value);
+        //bouncce back!
+        ws.onmessage = (event) => {
+            list.push(event.data);
+            let itm = localStorage.getItem('todo');
+            if (itm.length > 0){
+               let prev = itm.split(",");
+               prev.push(event.data);
+               localStorage.setItem(`todo`,prev);
+            }else{
+                localStorage.setItem(`todo`,list);
+            }
+            displaytodo();
+        }
+   }
+    function displaytodo(){
+        let arr = localStorage.getItem('todo').split(","); 
+        console.log(arr);
+        let buffer = "";
+        for (let i=0;i<arr.length;i++){
+            console.log(arr[i]);
+            let template = `<div class="todo-note" id=${i}>
+                <li class="note">${arr[i]}</li>
+                <button class="del-button" onclick="deletetodo(this)" data-id=${i}>X</button>
+            </div>`
+            buffer += template;
+        }
+        let fulltemp = `<ul class="todo-box">${buffer}</ul>`;
+        if (arr.length === 1 && arr[0] === "") fulltemp = "";
+        todo_box.innerHTML = fulltemp;
+    }
+    function  deletetodo(event){
+        let id = event.getAttribute('data-id');
+        console.log(id);
+        console.log("this id " + id);
+        let itm = localStorage.getItem('todo');
+        if (itm.length > 0){
+            let prev = itm.split(",");
+            prev.push(event.data);
+            localStorage.setItem(`todo`,prev);
+        }else{
+            localStorage.setItem(`todo`,list);
+        }
+        let prev = itm.split(",");
+        let newarr = prev;
+        newarr.splice(id,1);
+        localStorage.setItem("todo",newarr);
+        displaytodo();
+    }
+    let submit_todo = document.getElementById("submit-todo");
+    todo_input.addEventListener("keypress",(e) => {
+        if (e.key === 'Enter'){
+            console.log("app")
+            submittodo()
+        }
+    })
+    submit_todo.addEventListener("click",(e) => {
+        e.preventDefault();
+        submittodo();
+    });
+
+    displaytodo();
+</script>

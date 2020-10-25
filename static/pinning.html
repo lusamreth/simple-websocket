@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="main.css">
+    <title>Document</title>
+</head>
+<body>
+    <div class="container">
+        <div class="pinning">
+            <div class="inpa" >
+                <h1>Latency Testing</h1>
+                <br>
+                <p class="entry">Input</p>
+                <div class="inputs" id="input-fields">
+                    <p id="entry-err-1"></p>
+                    <div class="length">
+                        <p class="txt-len" id="txt-length">0</p>
+                        <p> /</p>
+                        <p id="word-limit">50 words</p>
+                    </div>
+                    <input type="text" id="payload" placeholder="Echo through socket">
+                    <p id="entry-err-2"></p>
+                    <input type="text" placeholder="Duration" id="duration-input">
+                    <p id="entry-err-3"></p>
+                    <input type="text" placeholder="Interval" id="interval-input">
+                </div>
+                <button id = "submit-test">Submit</button>
+            </div>
+            <div class="result">
+                <div class="benchmark">
+                    <h2>Benchmarking</h2>
+                    <div class="timer"> 
+                        <div class="timer-start">
+                            <p>Start-time:</p>
+                            <p id="start-time"></p>
+                        </div>
+                        <div class="timer-end">
+                            <p>end-time:</p>
+                            <p id="end-time"></p>
+                        </div>
+                    </div>
+                    <hr>
+                    <br>
+                    <div class="info"> 
+                        <div class="info-block">
+                            <div id="info-list">
+                                <div id="msg">
+                                    <p>Message:</p> 
+                                    <p id="msg-output"></p>
+                                </div>
+                                <div id="dur">
+                                    <p>Duration: </p> 
+                                    <p id="dur-output"></p>
+                                </div>
+                                <div id="intv">
+                                    <p>Execution Interval: </p>
+                                    <p id="inv-output"></p>
+                                </div>
+                                <div class="run-count">
+                                    <p>Run-count : </p>
+                                    <p id="run-counter"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--  Logging Sectionc -->
+                <div class="log-container">
+                    <div class="control">
+                        <div class="menu">
+                            <h1>Menu</h1>
+                            <p>Exec-Methods</p>
+                        </div>
+                        <div id="control-buttons">
+                            <button class="ctl-but start">Start</button>
+                            <button class="ctl-but stop">Stop</button>
+                            <button class="ctl-but clear">Clear</button>
+                        </div>
+                    </div>
+                    <br>
+                    <p id="logs">
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="back" id="back-1" back-location="echo.html"><h1>&lt&lt</h1></div>
+</body>
+</html>
+<script src="shared.js"></script>
+<script>
+const addr = "ws://127.0.0.1:8080/wss";
+const ws = new WebSocket(addr);
+
+let duration = document.getElementById("duration-input");
+let interval = document.getElementById("interval-input");
+let input_msg = document.getElementById("payload");
+let word_limit = 50;
+let msg_length = 0
+document.getElementById("word-limit").innerHTML = `${word_limit} words`;
+
+let error_msg = [];
+let dv,iv;
+let anyError;
+
+field_listener();
+
+class LogController{
+    constructor(capacity){
+        this.stop = true;
+        this.tracker = 0;
+        this.message = null;
+        // need this to stop the log
+        this.capacity = capacity;
+        this.echotime = 0;
+    }
+
+    start_log(inv){
+        console.log("start!");
+        this.reset();
+        let exec = setInterval(() => {
+            this.counter(exec);
+        }, inv)
+    }
+    reset(){
+        this.tracker = 0;
+        this.stop = false;
+    }
+    stop_log(){
+        this.stop = true;
+    }
+    clear_log(){
+        this.stop_log();
+        this.reset();
+        this.update_tracker();
+        document.getElementById("logs").innerHTML = "";
+    }
+    update_tracker(){
+        document.getElementById("run-counter").innerHTML = this.tracker;
+    }
+    counter(callback){
+        if (this.capacity-- > 0 && this.stop === false){
+            this.echotime = Date.now();
+            ws.send(this.message);
+            this.tracker++;
+            this.update_tracker();
+        }
+        // end the log process
+        else{
+            update_time("end-time");
+            document.getElementById("logs").innerHTML += `<li class="entry">
+                Logging Finished!
+            </li>`;
+            clearInterval(callback);
+        }
+    }
+}
+
+let lct = new LogController(0);
+function run(){
+    //cif(dv === "" || iv === ""){
+        //creturn;
+    //c}
+    let throwbacks = [];
+    let msg_value = input_msg.value;
+    let snt_interval = dv / iv;
+    let echotime = 0;
+
+    let snt_count = Math.floor(snt_interval);
+    lct.capacity = snt_count;
+    let latencyRecord = [];
+
+    lct.message = msg_value;
+    lct.start_log(iv);
+    //let exec = setInterval(() => {
+        //lct.counter(exec);
+    //},iv);
+    ws.onmessage = (e) => {
+        console.log("message" + " " + e.data);
+        let latency;
+        let now = Date.now() ;
+        if(e.data !== null){
+            latency = now - lct.echotime; 
+        }else{
+            latency = -1; // indicate error
+        }
+        if (latency > 1000) {
+            throwbacks.push("The latency is too high! Abort");
+            return;
+        }
+        let timeprop = fetch_now();
+        latencyRecord.push(latency);
+        console.log(latency);
+        document.getElementById("logs").innerHTML += `<li class="entry">
+            <p class="log-prefix">[${timeprop.h}:${timeprop.m}:${timeprop.s}.${timeprop.ms}]</p> 
+           <p> -> ${latency}ms : ${e.data}</p>
+          </li>`
+
+    }
+    ws.onerror = (error) => {
+        throwbacks.push("callbacks-error" + ": " + error);
+    }
+    ws.onclose = (e) => {
+        console.log("closed!");
+    }
+    let timeout = dv * 1.2; // default timeouts window
+    if(throwbacks.length > 0 ){
+        throwbacks.forEach(e => {
+            document.getElementById("logs").innerHTML += `<li class="entry">
+                <p class="error-prefix">[${timeprop.h}:${timeprop.m}:${timeprop.s}.${timeprop.ms}]</p> 
+                <p> -> ${e}</p>
+            </li>`
+        })
+    }
+    // checking input 
+    setTimeout(() => {
+       let avg_latency = latencyRecord.reduce((a,b) => a + b,0) / latencyRecord.length;
+       let avg = avg_latency / 2;
+    }, timeout);
+}
+
+
+// get the time and add "0" padding 
+function fetch_now(){
+    let dt = new Date(); 
+    let zero_pad = "";
+    let timeprop = {
+        h:dt.getHours(),
+        m:dt.getMinutes(),
+        s:dt.getSeconds(),
+        ms:dt.getMilliseconds()
+    }
+
+    for (let time_ele in timeprop){
+        console.log(time_ele);
+        let db_digit = timeprop[time_ele] >= 10 && timeprop[time_ele] < 100;
+        let sg_digit = timeprop[time_ele] < 10;
+
+        if(sg_digit){
+
+            zero_pad = "0";
+            timeprop[time_ele] = `${zero_pad}${timeprop[time_ele]}`;
+
+        }else if(time_ele === "ms" && db_digit){ // milliseconds need to be 3 digits long
+
+            zero_pad = "0";
+            timeprop[time_ele] = `${zero_pad}${timeprop[time_ele]}`;
+
+        }else if(db_digit){
+
+            zero_pad = "";
+
+        }
+    }
+    return timeprop;
+}
+// listening to the input field
+let info_list = document.getElementById("info-list");
+function field_listener(){
+    let fields = document.getElementById("input-fields").getElementsByTagName("input");
+    console.log(fields);
+    for(let i=0 ;i<fields.length;i++){
+        fields.item(i).addEventListener("keyup",() => {
+            dv = parseFloat(fields.item(1).value);
+            iv = parseFloat(fields.item(2).value);
+            let msg_value = fields.item(0).value;
+            msg_length = msg_value.length;
+            document.getElementById("txt-length").innerHTML = `${msg_length}`;
+            if (isNaN(dv)){
+                error_msg.push([1,"Duration field only accept numbers!"]);
+            }
+            if(isNaN(iv)){
+                error_msg.push([2,"Interval field only accept numbers!"]);
+            }
+            if (!msg_value){
+                error_msg.push([0,"Please fill in the message!"])
+            };
+            if(iv > dv){
+                error_msg.push([1,"Interval must be lesser then the duration in which the process live!"])
+            }
+            if(msg_length > word_limit){
+                error_msg.push([0,"The word length is off limit!"]);
+            }
+            anyError = error_checking();
+        }) 
+    }
+}
+function update_field(){
+    let ls_children = info_list.children;
+    let dv = parseFloat(duration.value);
+    let iv = parseFloat(interval.value);
+    let val = [input_msg.value,dv,iv];
+    if(anyError === true) {
+        return
+    }else{
+        for(let i = 0;i<3;i++){
+            ls_children[i].lastChild.textContent = ` ${val[i]}`
+        }
+    };
+}
+
+let error_ouput = document.getElementById("errors");
+let p_tags = document.getElementById("input-fields").getElementsByTagName("p");
+function error_checking(){
+    let field_errors = [];
+    for(let i = 0;i< 3;i++){
+        field_errors.push(document.getElementById(`entry-err-${i+1}`));
+    }
+    console.log(field_errors);
+    let state = Array.from({length:field_errors.length}).map(() => 0);
+    state.forEach((e,i) => {
+        if(e === 0){
+            field_errors[i].innerHTML = "";
+        }else{
+            console.log(state);
+        }
+    });     
+    if(error_msg.length > 0){
+        error_msg.forEach((e,i) => {
+            if (!isNaN(e[0])){ 
+                // field errors !
+                e[1] = `Exception! : ${e[1]}`;
+                field_errors[e[0]].innerHTML = e[1];
+                state[e[0]] += 1;
+            }
+        });
+        // reset stack!
+        error_msg = [];
+        // reset the error text fields! 
+        state = [0,0,0];
+        return true;
+    }
+
+    return false;
+}
+document.getElementById("submit-test").addEventListener("click",() => {
+    update_field(); 
+    //run();
+});
+
+let control = document.getElementById("control-buttons");
+control.children.item(0).addEventListener("click",() => {
+    console.log(error_checking());
+    if(anyError){
+        console.log('error');
+        return;
+    }
+    setTimeout(() => {
+        console.log("apple");
+        field_listener();
+        console.log(anyError);
+    },100)
+    update_time("start-time");
+    update_field();
+    run();
+});
+
+function update_time(element_id){
+    let {h,m,s} = fetch_now();
+    let formated = `${h}:${m}:${s}`;
+    document.getElementById(`${element_id}`).innerHTML = formated;
+}
+
+control.children.item(1).addEventListener("click",() => {
+    lct.stop_log();
+});
+
+control.children.item(2).addEventListener("click",() => {
+    update_time("end-time");
+    lct.stop_log();
+    lct.clear_log();
+});
+</script>
+<style>
+.container {
+    height: 100vh;
+    /*justify-content: center;*/
+    margin-left: 30px;
+    align-items: center;
+}
+.pinning{
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+}
+.pinning input {
+    min-width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+}
+button {
+    border: 0;
+}
+#submit-test{
+    min-width: 50%;
+    background-color: #228B22;
+    border: 0;
+    padding: 10px;
+    color: white;
+}
+.inpa{
+   align-self: center;
+   margin: 30px; 
+   width: 50%;
+}
+.pinning .result{
+    border: 2px solid black;
+    max-height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.entry-err1,.entry-err2,.entry-err3{
+    color: red;
+}
+.benchmark{
+    line-height: 1.5;
+    padding: 15px;
+}
+.info-block{
+    display: flex;
+}
+#info-list {
+    display: flex;
+    flex-direction: column;
+}
+#info-list > div{
+    display: flex;
+    flex-direction: row;
+}
+
+.next h1,.back h1{
+    cursor: pointer;
+    padding: 15px;
+}
+.timer > div{
+    display: flex;
+}
+.timer > div > p:nth-child(2) {
+    padding: 0 10px;
+}
+.log-container{
+    position: relative;
+    overflow-y: scroll;
+    background-color: black;
+    color: white;
+    height: 60%;
+    align-self: flex-end;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.length{
+    display: flex;
+}
+#logs{
+    margin-top: 120px;
+}
+.entry{
+    margin: 5px;
+    display: flex;
+    align-content: center;
+    word-wrap: break-word;
+}
+.log-prefix .error-prefix{
+    padding: 0 5px;  
+}
+.error-prefix {
+    color: red;
+}
+.control{
+    width: 60.8999%;/*wth is this??*/
+    position: fixed;
+    padding: 12px;
+    height: 120px;
+    background-color:green;
+}
+.menu{
+    margin-right: 22px;
+}
+.ctl-but{
+    border-radius: 5px;
+    padding:8px 30px;
+    margin: 5px;
+    color: white;
+}
+.ctl-but.start {
+    background-color: #228B22;
+}
+.ctl-but.stop {
+    background-color: red;
+}
+.ctl-but.clear{
+    background-color: #4C228A;
+}
+</style>
